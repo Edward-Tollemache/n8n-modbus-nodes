@@ -122,6 +122,17 @@ export class Modbus implements INodeType {
 				default: 1,
 				description: 'The value to write to the holding register',
 			},
+			{
+				displayName: 'Unit ID',
+				name: 'unitId',
+				type: 'number',
+				default: 1,
+				description: 'The Modbus unit/slave ID (0-255). Use 0 for devices that require it.',
+				typeOptions: {
+					maxValue: 255,
+					minValue: 0,
+				},
+			},
 		],
 	};
 
@@ -132,6 +143,7 @@ export class Modbus implements INodeType {
 
 		const memoryAddress = this.getNodeParameter('memoryAddress', 0) as number;
 		const operation = this.getNodeParameter('operation', 0) as string;
+		const unitId = this.getNodeParameter('unitId', 0) as number;
 
 		if (operation === 'read') {
 			const functionCode = this.getNodeParameter('functionCode', 0) as string;
@@ -140,7 +152,7 @@ export class Modbus implements INodeType {
 			await new Promise((resolve) => {
 				switch (functionCode) {
 					case 'FC1':
-						client.readCoils({ address: memoryAddress, quantity }, (err, data) => {
+						client.readCoils({ address: memoryAddress, quantity, extra: { unitId } }, (err, data) => {
 							if (err) {
 								throw new NodeOperationError(this.getNode(), 'MODBUS FC1 Error: ' + err.message);
 							}
@@ -158,7 +170,7 @@ export class Modbus implements INodeType {
 						break;
 
 					case 'FC2':
-						client.readDiscreteInputs({ address: memoryAddress, quantity }, (err, data) => {
+						client.readDiscreteInputs({ address: memoryAddress, quantity, extra: { unitId } }, (err, data) => {
 							if (err) {
 								throw new NodeOperationError(this.getNode(), 'MODBUS FC2 Error: ' + err.message);
 							}
@@ -176,7 +188,7 @@ export class Modbus implements INodeType {
 						break;
 
 					case 'FC3':
-						client.readHoldingRegisters({ address: memoryAddress, quantity }, (err, data) => {
+						client.readHoldingRegisters({ address: memoryAddress, quantity, extra: { unitId } }, (err, data) => {
 							if (err) {
 								throw new NodeOperationError(this.getNode(), 'MODBUS FC3 Error: ' + err.message);
 							}
@@ -194,7 +206,7 @@ export class Modbus implements INodeType {
 						break;
 
 					case 'FC4':
-						client.readInputRegisters({ address: memoryAddress, quantity }, (err, data) => {
+						client.readInputRegisters({ address: memoryAddress, quantity, extra: { unitId } }, (err, data) => {
 							if (err) {
 								throw new NodeOperationError(this.getNode(), 'MODBUS FC4 Error: ' + err.message);
 							}
@@ -224,7 +236,7 @@ export class Modbus implements INodeType {
 			buffer.writeInt16BE(value);
 
 			await new Promise((resolve) => {
-				client.writeSingleRegister({ address: memoryAddress, value: buffer }, (err, data) => {
+				client.writeSingleRegister({ address: memoryAddress, value: buffer, extra: { unitId } }, (err, data) => {
 					if (err) {
 						throw new NodeOperationError(this.getNode(), 'MODBUS Write Error: ' + err.message);
 					}

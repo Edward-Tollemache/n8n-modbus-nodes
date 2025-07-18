@@ -103,6 +103,17 @@ export class ModbusTrigger implements INodeType {
 				description: 'The polling interval in milliseconds',
 			},
 			{
+				displayName: 'Unit ID',
+				name: 'unitId',
+				type: 'number',
+				default: 1,
+				description: 'The Modbus unit/slave ID (0-255). Use 0 for devices that require it.',
+				typeOptions: {
+					maxValue: 255,
+					minValue: 0,
+				},
+			},
+			{
 				displayName: 'Options',
 				name: 'options',
 				type: 'collection',
@@ -123,6 +134,7 @@ export class ModbusTrigger implements INodeType {
 			const memoryAddress = this.getNodeParameter('memoryAddress') as number;
 			const quantity = this.getNodeParameter('quantity') as number;
 			const polling = this.getNodeParameter('polling') as number;
+			const unitId = this.getNodeParameter('unitId') as number;
 			const options = this.getNodeParameter('options') as Options;
 
 			// Parse the memory address as an integer
@@ -142,16 +154,16 @@ export class ModbusTrigger implements INodeType {
 			const readModbusData = (callback: (err: any, data: any) => void) => {
 				switch (functionCode) {
 					case 'FC1':
-						client.readCoils({ address: memoryAddress, quantity }, callback);
+						client.readCoils({ address: memoryAddress, quantity, extra: { unitId } }, callback);
 						break;
 					case 'FC2':
-						client.readDiscreteInputs({ address: memoryAddress, quantity }, callback);
+						client.readDiscreteInputs({ address: memoryAddress, quantity, extra: { unitId } }, callback);
 						break;
 					case 'FC3':
-						client.readHoldingRegisters({ address: memoryAddress, quantity }, callback);
+						client.readHoldingRegisters({ address: memoryAddress, quantity, extra: { unitId } }, callback);
 						break;
 					case 'FC4':
-						client.readInputRegisters({ address: memoryAddress, quantity }, callback);
+						client.readInputRegisters({ address: memoryAddress, quantity, extra: { unitId } }, callback);
 						break;
 					default:
 						callback(new Error('Invalid function code: ' + functionCode), null);

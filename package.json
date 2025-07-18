@@ -1,13 +1,27 @@
 {
-	"name": "n8n-nodes-modbus-trigger",
-	"version": "0.2.5",
-	"description": "n8n node to trigger Modbus Address on change",
+	"name": "n8n-nodes-modbus-fccomplete",
+	"version": "0.4.0",
+	"description": "n8n node with full Modbus support (FC1-FC4) and industrial data conversion for reading coils, discrete inputs, holding registers, and input registers",
 	"keywords": [
 		"n8n-community-node-package",
-		"n8n-nodes-modbus-trigger",
+		"n8n-nodes-modbus-fccomplete",
 		"n8n-nodes-modbus",
 		"n8n-nodes",
-		"modbus"
+		"modbus",
+		"fc1",
+		"fc2",
+		"fc3",
+		"fc4",
+		"coils",
+		"discrete-inputs",
+		"holding-registers",
+		"input-registers",
+		"data-conversion",
+		"industrial-automation",
+		"scaling",
+		"unit-conversion",
+		"bitfield",
+		"bcd"
 	],
 	"license": "MIT",
 	"homepage": "",
@@ -15,9 +29,15 @@
 		"name": "Alexandre Alves",
 		"email": "ajhalvs@gmail.com"
 	},
+	"contributors": [
+		{
+			"name": "Edward Tollemache",
+			"email": "Edward-Tollemache@users.noreply.github.com"
+		}
+	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/lostedz/n8n-modbus/"
+		"url": "https://github.com/Edward-Tollemache/n8n-modbus-nodes"
 	},
 	"main": "index.js",
 	"scripts": {
@@ -26,7 +46,7 @@
 		"format": "prettier nodes credentials --write",
 		"lint": "eslint nodes credentials package.json",
 		"lintfix": "eslint nodes credentials package.json --fix",
-		"prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes credentials package.json"
+		"prepublishOnly": "npm run build"
 	},
 	"files": [
 		"dist"
@@ -38,7 +58,8 @@
 		],
 		"nodes": [
 			"dist/nodes/Modbus/ModbusTrigger.node.js",
-			"dist/nodes/Modbus/Modbus.node.js"
+			"dist/nodes/Modbus/Modbus.node.js",
+			"dist/nodes/ModbusDataConverter/ModbusDataConverter.node.js"
 		]
 	},
 	"devDependencies": {

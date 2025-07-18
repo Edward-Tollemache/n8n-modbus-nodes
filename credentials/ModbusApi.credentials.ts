@@ -32,5 +32,16 @@ export class ModbusApi implements ICredentialType {
 			type: 'number',
 			default: 502,
 		},
+		{
+			displayName: 'Unit ID',
+			name: 'unitId',
+			type: 'number',
+			default: 1,
+			description: 'The Modbus unit/slave ID for the device (0-255)',
+			typeOptions: {
+				maxValue: 255,
+				minValue: 0,
+			},
+		},
 	];
 }
