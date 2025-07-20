@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-modbus-fccomplete",
-	"version": "0.4.0",
-	"description": "n8n node with full Modbus support (FC1-FC4) and industrial data conversion for reading coils, discrete inputs, holding registers, and input registers",
+	"version": "0.5.2",
+	"description": "n8n nodes for industrial automation with full Modbus support (FC1-FC4) and enhanced data conversion with auto-detection and device presets",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n-nodes-modbus-fccomplete",
@@ -21,7 +21,10 @@
 		"scaling",
 		"unit-conversion",
 		"bitfield",
-		"bcd"
+		"bcd",
+		"auto-detection",
+		"device-presets",
+		"enhanced-converter"
 	],
 	"license": "MIT",
 	"homepage": "",

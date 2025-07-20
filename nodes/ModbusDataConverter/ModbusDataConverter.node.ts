@@ -7,28 +7,16 @@ import type {
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
-import { DataConversionUtils, ConversionRule, ConversionResult } from './DataConversionUtils';
-import { ValidationUtils } from './ValidationUtils';
-
-export interface NodeParameters {
-	conversions: ConversionRule[];
-	inputSource: 'data' | 'values' | 'registers' | 'custom_path';
-	customPath?: string;
-	outputFormat: 'individual_fields' | 'conversion_object' | 'both';
-	addTimestamp: boolean;
-	addMetadata: boolean;
-	errorHandling: 'stop_on_error' | 'skip_invalid' | 'default_values';
-	performanceMode: boolean;
-}
+import { DataConversionUtils } from './DataConversionUtils';
 
 export class ModbusDataConverter implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Modbus Data Converter',
 		name: 'modbusDataConverter',
 		icon: 'file:modbus.svg',
-		group: ['input'],
-		version: 1,
-		description: 'Convert raw Modbus register data into industrial standard data types',
+		group: ['transform'],
+		version: 2,
+		description: 'Convert Modbus register data with auto-detection and simple options',
 		eventTriggerDescription: '',
 		defaults: {
 			name: 'Modbus Data Converter',
@@ -38,54 +26,123 @@ export class ModbusDataConverter implements INodeType {
 		//@ts-ignore
 		outputs: ['main'],
 		properties: [
+			// Simplified Mode Selection
 			{
-				displayName: 'Input Source',
-				name: 'inputSource',
+				displayName: 'Conversion Mode',
+				name: 'conversionMode',
 				type: 'options',
 				options: [
 					{
-						name: 'Data Property',
-						value: 'data',
-						description: 'Use the "data" property from input',
+						name: 'Quick Convert',
+						value: 'quick',
+						description: 'Simple conversions with basic options',
 					},
 					{
-						name: 'Values Array',
-						value: 'values',
-						description: 'Use input as array of values',
-					},
-					{
-						name: 'Registers Property',
-						value: 'registers',
-						description: 'Use the "registers" property from input',
-					},
-					{
-						name: 'Custom Path',
-						value: 'custom_path',
-						description: 'Use a custom property path',
+						name: 'Custom',
+						value: 'custom',
+						description: 'Manual configuration for advanced use cases',
 					},
 				],
-				default: 'data',
-				description: 'Where to find the Modbus register data in the input',
+				default: 'quick',
+				description: 'Choose how to convert the data',
 			},
+
+			// Quick Convert Options
 			{
-				displayName: 'Custom Path',
-				name: 'customPath',
-				type: 'string',
+				displayName: 'Quick Convert Type',
+				name: 'quickConvertType',
+				type: 'options',
 				displayOptions: {
 					show: {
-						inputSource: ['custom_path'],
+						conversionMode: ['quick'],
 					},
 				},
-				default: '',
-				placeholder: 'e.g., response.data.registers',
-				description: 'Dot notation path to the register data (e.g., response.data.registers)',
+				options: [
+					{
+						name: 'Single Value (INT16/Scaled)',
+						value: 'single',
+						description: 'Convert single register value',
+					},
+					{
+						name: 'Float (2 Registers)',
+						value: 'float',
+						description: 'Convert two registers to floating point',
+					},
+					{
+						name: 'Long Integer (2 Registers)',
+						value: 'long',
+						description: 'Convert two registers to 32-bit integer',
+					},
+					{
+						name: 'All Common Types',
+						value: 'all',
+						description: 'Show all possible conversions',
+					},
+				],
+				default: 'float',
 			},
+
+
+			// Simple Options
 			{
-				displayName: 'Conversions',
+				displayName: 'Options',
+				name: 'simpleOptions',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				displayOptions: {
+					show: {
+						conversionMode: ['quick'],
+					},
+				},
+				options: [
+					{
+						displayName: 'Byte Order',
+						name: 'byteOrder',
+						type: 'options',
+						options: [
+							{
+								name: 'Big Endian (BE)',
+								value: 'BE',
+								description: 'Most significant byte first (default)',
+							},
+							{
+								name: 'Little Endian (LE)',
+								value: 'LE',
+								description: 'Least significant byte first',
+							},
+						],
+						default: 'BE',
+					},
+					{
+						displayName: 'Add Raw Data',
+						name: 'includeRaw',
+						type: 'boolean',
+						default: false,
+						description: 'Include original register values in output',
+					},
+					{
+						displayName: 'Add Metadata',
+						name: 'includeMetadata',
+						type: 'boolean',
+						default: false,
+						description: 'Include conversion information in output',
+					},
+				],
+			},
+
+			// Custom Conversion Rules (existing implementation)
+			{
+				displayName: 'Custom Conversions',
 				name: 'conversions',
 				type: 'collection',
 				placeholder: 'Add Conversion',
 				default: {},
+				displayOptions: {
+					show: {
+						conversionMode: ['custom'],
+					},
+				},
 				typeOptions: {
 					multipleValues: true,
 					multipleValueButtonText: 'Add Conversion Rule',
@@ -96,15 +153,13 @@ export class ModbusDataConverter implements INodeType {
 						name: 'name',
 						type: 'string',
 						default: '',
-
-						description: 'Name for the converted value (used as output property)',
+						description: 'Name for the converted value',
 					},
 					{
 						displayName: 'Start Register',
 						name: 'startRegister',
 						type: 'number',
 						default: 0,
-						required: true,
 						description: 'Starting register index (0-based)',
 					},
 					{
@@ -136,17 +191,8 @@ export class ModbusDataConverter implements INodeType {
 								name: 'SCALED - Raw Value with Scaling',
 								value: 'scaled',
 							},
-							{
-								name: 'BITFIELD - Extract Bits',
-								value: 'bitfield',
-							},
-							{
-								name: 'BCD - Binary Coded Decimal',
-								value: 'bcd',
-							},
 						],
 						default: 'int16',
-						required: true,
 						description: 'Data type for conversion',
 					},
 					{
@@ -155,17 +201,16 @@ export class ModbusDataConverter implements INodeType {
 						type: 'options',
 						options: [
 							{
-								name: 'Big Endian (Motorola)',
+								name: 'Big Endian (ABCD)',
 								value: 'big_endian',
 							},
 							{
-								name: 'Little Endian (Intel)',
+								name: 'Little Endian (DCBA)',
 								value: 'little_endian',
 							},
 						],
 						default: 'big_endian',
-						required: true,
-						description: 'Byte order for multi-register conversions',
+						description: 'Byte order for multi-register values',
 					},
 					{
 						displayName: 'Scale Factor',
@@ -177,7 +222,7 @@ export class ModbusDataConverter implements INodeType {
 							},
 						},
 						default: 1,
-						description: 'Multiply raw value by this factor',
+						description: 'Divide raw value by this factor',
 					},
 					{
 						displayName: 'Offset',
@@ -191,266 +236,35 @@ export class ModbusDataConverter implements INodeType {
 						default: 0,
 						description: 'Add this value after scaling',
 					},
-					{
-						displayName: 'Bit Mask',
-						name: 'bitMask',
-						type: 'number',
-						displayOptions: {
-							show: {
-								dataType: ['bitfield'],
-							},
-						},
-						default: 0,
-						description: 'Bit mask for extraction (e.g., 0x00FF)',
-					},
-					{
-						displayName: 'Bit Position',
-						name: 'bitPosition',
-						type: 'number',
-						displayOptions: {
-							show: {
-								dataType: ['bitfield'],
-							},
-						},
-						default: 0,
-						typeOptions: {
-							minValue: 0,
-							maxValue: 15,
-						},
-						description: 'Starting bit position (0-15)',
-					},
-					{
-						displayName: 'Bit Length',
-						name: 'bitLength',
-						type: 'number',
-						displayOptions: {
-							show: {
-								dataType: ['bitfield'],
-							},
-						},
-						default: 1,
-						typeOptions: {
-							minValue: 1,
-							maxValue: 16,
-						},
-						description: 'Number of bits to extract',
-					},
-					{
-						displayName: 'Decimal Places',
-						name: 'decimalPlaces',
-						type: 'number',
-						default: 2,
-						typeOptions: {
-							minValue: 0,
-							maxValue: 10,
-						},
-						description: 'Number of decimal places for output',
-					},
-					{
-						displayName: 'Enable Validation',
-						name: 'enableValidation',
-						type: 'boolean',
-						default: false,
-						description: 'Enable min/max validation for converted values',
-					},
-					{
-						displayName: 'Validation Settings',
-						name: 'validation',
-						type: 'collection',
-						displayOptions: {
-							show: {
-								enableValidation: [true],
-							},
-						},
-						default: {},
-						options: [
-							{
-								displayName: 'Minimum Value',
-								name: 'min',
-								type: 'number',
-								default: 0,
-								description: 'Minimum allowed value',
-							},
-							{
-								displayName: 'Maximum Value',
-								name: 'max',
-								type: 'number',
-								default: 100,
-								description: 'Maximum allowed value',
-							},
-							{
-								displayName: 'Allow NaN',
-								name: 'allowNaN',
-								type: 'boolean',
-								default: false,
-								description: 'Allow NaN values to pass validation',
-							},
-						],
-					},
-					{
-						displayName: 'Enable Unit Conversion',
-						name: 'enableUnitConversion',
-						type: 'boolean',
-						default: false,
-						description: 'Enable unit conversion for the value',
-					},
-					{
-						displayName: 'Unit Conversion',
-						name: 'unitConversion',
-						type: 'collection',
-						displayOptions: {
-							show: {
-								enableUnitConversion: [true],
-							},
-						},
-						default: {},
-						options: [
-							{
-								displayName: 'From Unit',
-								name: 'from',
-								type: 'options',
-								options: [
-									// Temperature
-									{ name: 'Celsius (°C)', value: 'celsius' },
-									{ name: 'Fahrenheit (°F)', value: 'fahrenheit' },
-									{ name: 'Kelvin (K)', value: 'kelvin' },
-									// Pressure
-									{ name: 'Pascal (Pa)', value: 'pascal' },
-									{ name: 'Bar', value: 'bar' },
-									{ name: 'PSI', value: 'psi' },
-									{ name: 'Atmosphere', value: 'atm' },
-									// Flow
-									{ name: 'Liters per Minute (LPM)', value: 'lpm' },
-									{ name: 'Gallons per Minute (GPM)', value: 'gpm' },
-									{ name: 'Cubic Feet per Minute (CFM)', value: 'cfm' },
-									{ name: 'Cubic Meters per Hour (CMH)', value: 'cmh' },
-									// Power
-									{ name: 'Watt (W)', value: 'watt' },
-									{ name: 'Kilowatt (kW)', value: 'kilowatt' },
-									{ name: 'Horsepower (Hp)', value: 'horsepower' },
-									{ name: 'BTU per Hour', value: 'btu_h' },
-									// Length
-									{ name: 'Meter (M)', value: 'meter' },
-									{ name: 'Foot (Ft)', value: 'foot' },
-									{ name: 'Inch (In)', value: 'inch' },
-									{ name: 'Millimeter (Mm)', value: 'millimeter' },
-									// Mass
-									{ name: 'Kilogram (Kg)', value: 'kilogram' },
-									{ name: 'Pound (Lb)', value: 'pound' },
-									{ name: 'Gram (G)', value: 'gram' },
-								],
-								default: 'celsius',
-								description: 'Source unit',
-							},
-							{
-								displayName: 'To Unit',
-								name: 'to',
-								type: 'options',
-								options: [
-									// Temperature
-									{ name: 'Celsius (°C)', value: 'celsius' },
-									{ name: 'Fahrenheit (°F)', value: 'fahrenheit' },
-									{ name: 'Kelvin (K)', value: 'kelvin' },
-									// Pressure
-									{ name: 'Pascal (Pa)', value: 'pascal' },
-									{ name: 'Bar', value: 'bar' },
-									{ name: 'PSI', value: 'psi' },
-									{ name: 'Atmosphere', value: 'atm' },
-									// Flow
-									{ name: 'Liters per Minute (LPM)', value: 'lpm' },
-									{ name: 'Gallons per Minute (GPM)', value: 'gpm' },
-									{ name: 'Cubic Feet per Minute (CFM)', value: 'cfm' },
-									{ name: 'Cubic Meters per Hour (CMH)', value: 'cmh' },
-									// Power
-									{ name: 'Watt (W)', value: 'watt' },
-									{ name: 'Kilowatt (kW)', value: 'kilowatt' },
-									{ name: 'Horsepower (Hp)', value: 'horsepower' },
-									{ name: 'BTU per Hour', value: 'btu_h' },
-									// Length
-									{ name: 'Meter (M)', value: 'meter' },
-									{ name: 'Foot (Ft)', value: 'foot' },
-									{ name: 'Inch (In)', value: 'inch' },
-									{ name: 'Millimeter (Mm)', value: 'millimeter' },
-									// Mass
-									{ name: 'Kilogram (Kg)', value: 'kilogram' },
-									{ name: 'Pound (Lb)', value: 'pound' },
-									{ name: 'Gram (G)', value: 'gram' },
-								],
-								default: 'fahrenheit',
-								description: 'Target unit',
-							},
-						],
-					},
 				],
 			},
+
+			// Input Source (simplified)
 			{
-				displayName: 'Output Format',
-				name: 'outputFormat',
+				displayName: 'Input Source',
+				name: 'inputSource',
 				type: 'options',
+				displayOptions: {
+					show: {
+						conversionMode: ['custom'],
+					},
+				},
 				options: [
 					{
-						name: 'Individual Fields',
-						value: 'individual_fields',
-						description: 'Add each conversion as a separate property',
+						name: 'Auto-Detect',
+						value: 'auto',
+						description: 'Automatically find register data',
 					},
 					{
-						name: 'Conversion Object',
-						value: 'conversion_object',
-						description: 'Add all conversions in a single object',
+						name: 'Data Property',
+						value: 'data',
 					},
 					{
-						name: 'Both',
-						value: 'both',
-						description: 'Add both individual fields and conversion object',
+						name: 'Custom Path',
+						value: 'custom_path',
 					},
 				],
-				default: 'individual_fields',
-				description: 'How to format the output data',
-			},
-			{
-				displayName: 'Add Timestamp',
-				name: 'addTimestamp',
-				type: 'boolean',
-				default: true,
-				description: 'Add timestamp to output data',
-			},
-			{
-				displayName: 'Add Metadata',
-				name: 'addMetadata',
-				type: 'boolean',
-				default: false,
-				description: 'Add conversion metadata to output',
-			},
-			{
-				displayName: 'Error Handling',
-				name: 'errorHandling',
-				type: 'options',
-				options: [
-					{
-						name: 'Stop on Error',
-						value: 'stop_on_error',
-						description: 'Stop execution when conversion error occurs',
-					},
-					{
-						name: 'Skip Invalid',
-						value: 'skip_invalid',
-						description: 'Skip invalid conversions and continue',
-					},
-					{
-						name: 'Use Default Values',
-						value: 'default_values',
-						description: 'Use default values for failed conversions',
-					},
-				],
-				default: 'skip_invalid',
-				description: 'How to handle conversion errors',
-			},
-			{
-				displayName: 'Performance Mode',
-				name: 'performanceMode',
-				type: 'boolean',
-				default: false,
-				description: 'Enable performance optimizations for large datasets',
+				default: 'auto',
 			},
 		],
 	};
@@ -459,85 +273,22 @@ export class ModbusDataConverter implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
-		// Get node parameters
-		const parameters: NodeParameters = {
-			conversions: this.getNodeParameter('conversions', 0) as ConversionRule[],
-			inputSource: this.getNodeParameter('inputSource', 0) as string,
-			customPath: this.getNodeParameter('customPath', 0) as string,
-			outputFormat: this.getNodeParameter('outputFormat', 0) as string,
-			addTimestamp: this.getNodeParameter('addTimestamp', 0) as boolean,
-			addMetadata: this.getNodeParameter('addMetadata', 0) as boolean,
-			errorHandling: this.getNodeParameter('errorHandling', 0) as string,
-			performanceMode: this.getNodeParameter('performanceMode', 0) as boolean,
-		} as NodeParameters;
+		const conversionMode = this.getNodeParameter('conversionMode', 0) as string;
 
-		// Validate node parameters
-		const parameterValidation = ValidationUtils.validateNodeParameters(parameters);
-		if (!parameterValidation.valid) {
-			throw new NodeOperationError(
-				this.getNode(),
-				ValidationUtils.createErrorMessage(parameterValidation, 'Node parameters')
-			);
-		}
-
-		// Process conversion rules
-		const processedRules = processConversionRules(parameters.conversions);
-
-		// Validate conversion rules
-		const rulesValidation = ValidationUtils.validateConversionRules(processedRules);
-		if (!rulesValidation.valid) {
-			throw new NodeOperationError(
-				this.getNode(),
-				ValidationUtils.createErrorMessage(rulesValidation, 'Conversion rules')
-			);
-		}
-
-		// Process each input item
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			const item = items[itemIndex];
 
 			try {
-				// Extract register data from input
-				const inputValidation = ValidationUtils.validateInputData(
-					item.json,
-					parameters.inputSource,
-					parameters.customPath
-				);
+				let outputData: IDataObject = {};
 
-				if (!inputValidation.valid) {
-					if (parameters.errorHandling === 'stop_on_error') {
-						throw new NodeOperationError(
-							this.getNode(),
-							ValidationUtils.createErrorMessage(inputValidation, `Input data for item ${itemIndex}`)
-						);
-					} else {
-						// Skip this item or use default
-						if (parameters.errorHandling === 'skip_invalid') {
-							continue;
-						}
-						// Use default empty data
-					}
+				switch (conversionMode) {
+					case 'quick':
+						outputData = await executeQuickMode(this, item, itemIndex);
+						break;
+					case 'custom':
+						outputData = await executeCustomMode(this, item, itemIndex);
+						break;
 				}
-
-				const registers = extractRegisters(item.json, parameters);
-
-				// Perform conversions
-				const conversionResults = DataConversionUtils.convertMultiple(registers, processedRules);
-
-				// Handle conversion errors
-				const validResults = handleConversionErrors(
-					conversionResults,
-					parameters.errorHandling,
-					itemIndex,
-					this.getNode()
-				);
-
-				// Format output
-				const outputData = formatOutput(
-					validResults,
-					parameters,
-					item.json
-				);
 
 				returnData.push({
 					json: outputData,
@@ -545,213 +296,192 @@ export class ModbusDataConverter implements INodeType {
 				});
 
 			} catch (error) {
-				if (parameters.errorHandling === 'stop_on_error') {
-					throw error;
-				}
-				// Skip this item for other error handling modes
+				throw new NodeOperationError(this.getNode(), error.message, { itemIndex });
 			}
 		}
 
 		return [returnData];
 	}
-
 }
 
-/**
- * Process conversion rules and handle UI-specific transformations
- */
-function processConversionRules(conversions: any[]): ConversionRule[] {
-		return conversions.map((conversion: any) => {
-			const rule: ConversionRule = {
-				name: conversion.name,
-				startRegister: conversion.startRegister,
-				dataType: conversion.dataType,
-				byteOrder: conversion.byteOrder,
-				scaleFactor: conversion.scaleFactor,
-				offset: conversion.offset,
-				decimalPlaces: conversion.decimalPlaces,
-				bitMask: conversion.bitMask,
-				bitPosition: conversion.bitPosition,
-				bitLength: conversion.bitLength,
-			};
 
-			// Handle validation settings
-			if (conversion.enableValidation && conversion.validation) {
-				rule.validation = {
-					enabled: true,
-					min: conversion.validation.min,
-					max: conversion.validation.max,
-					allowNaN: conversion.validation.allowNaN,
-				};
-			}
+async function executeQuickMode(context: IExecuteFunctions, item: INodeExecutionData, itemIndex: number): Promise<IDataObject> {
+		const quickType = context.getNodeParameter('quickConvertType', itemIndex) as string;
+		const options = context.getNodeParameter('simpleOptions', itemIndex, {}) as IDataObject;
+		const byteOrder = (options.byteOrder as string) || 'BE';
 
-			// Handle unit conversion
-			if (conversion.enableUnitConversion && conversion.unitConversion) {
-				rule.unitConversion = {
-					from: conversion.unitConversion.from,
-					to: conversion.unitConversion.to,
-				};
-			}
+		// Extract registers
+		const registers = extractRegistersSimple(item.json);
+		if (!registers || registers.length === 0) {
+			throw new Error('No register data found');
+		}
 
-			return rule;
-		});
-}
+		const output: IDataObject = {};
 
-/**
- * Extract registers from input data
- */
-function extractRegisters(inputData: IDataObject, parameters: NodeParameters): number[] {
-		let registers: number[] = [];
-
-		switch (parameters.inputSource) {
-			case 'data':
-				if (Array.isArray(inputData.data)) {
-					registers = inputData.data as number[];
-				} else if (typeof inputData.data === 'number') {
-					registers = [inputData.data as number];
-				} else if (inputData.data && typeof inputData.data === 'number') {
-					registers = [inputData.data as number];
+		switch (quickType) {
+			case 'single':
+				if (registers.length >= 1) {
+					output.value = registers[0];
+					output.scaled_100 = registers[0] / 100;
+					output.scaled_1000 = registers[0] / 1000;
 				}
 				break;
-			case 'values':
-				if (Array.isArray(inputData)) {
-					registers = inputData as number[];
-				}
-				break;
-			case 'registers':
-				if (Array.isArray(inputData.registers)) {
-					registers = inputData.registers as number[];
-				} else if (typeof inputData.registers === 'number') {
-					registers = [inputData.registers as number];
-				}
-				break;
-			case 'custom_path':
-				if (parameters.customPath) {
-					const pathValue = getValueByPath(inputData, parameters.customPath);
-					if (Array.isArray(pathValue)) {
-						registers = pathValue;
-					} else if (typeof pathValue === 'number') {
-						registers = [pathValue];
+
+			case 'float':
+				if (registers.length >= 2) {
+					const floatResult = DataConversionUtils.convertData(registers, {
+						name: 'value',
+						startRegister: 0,
+						dataType: 'float32',
+						byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					});
+					if (floatResult.valid) {
+						output.value = floatResult.value;
+						output.type = 'float32';
 					}
 				}
 				break;
+
+			case 'long':
+				if (registers.length >= 2) {
+					const int32Result = DataConversionUtils.convertData(registers, {
+						name: 'value_signed',
+						startRegister: 0,
+						dataType: 'int32',
+						byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					});
+					const uint32Result = DataConversionUtils.convertData(registers, {
+						name: 'value_unsigned',
+						startRegister: 0,
+						dataType: 'uint32',
+						byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					});
+					if (int32Result.valid) {
+						output.value_signed = int32Result.value;
+						output.value_unsigned = uint32Result.value;
+						output.type = 'int32/uint32';
+					}
+				}
+				break;
+
+			case 'all':
+				// Show all common conversions
+				const allResult: IDataObject = {
+					first_register: registers[0],
+				};
+				
+				// Single register conversions
+				if (registers.length >= 1) {
+					allResult.int16_value = registers[0];
+					allResult.uint16_value = registers[0] & 0xFFFF;
+					allResult.scaled_100 = registers[0] / 100;
+					allResult.scaled_1000 = registers[0] / 1000;
+				}
+				
+				// Two register conversions
+				if (registers.length >= 2) {
+					const floatResult = DataConversionUtils.convertData(registers, {
+						name: 'float32',
+						startRegister: 0,
+						dataType: 'float32',
+						byteOrder: 'big_endian',
+					});
+					const int32Result = DataConversionUtils.convertData(registers, {
+						name: 'int32',
+						startRegister: 0,
+						dataType: 'int32',
+						byteOrder: 'big_endian',
+					});
+					const uint32Result = DataConversionUtils.convertData(registers, {
+						name: 'uint32',
+						startRegister: 0,
+						dataType: 'uint32',
+						byteOrder: 'big_endian',
+					});
+					
+					if (floatResult.valid) allResult.float32_value = floatResult.value;
+					if (int32Result.valid) allResult.int32_value = int32Result.value;
+					if (uint32Result.valid) allResult.uint32_value = uint32Result.value;
+				}
+				
+				return allResult;
 		}
 
-		return registers;
+		if (options.includeRaw) {
+			output._raw = registers;
+		}
+
+		return output;
 }
 
-/**
- * Get value from object by dot notation path
- */
-function getValueByPath(obj: any, path: string): any {
-		return path.split('.').reduce((current, key) => {
-			return current && current[key] !== undefined ? current[key] : undefined;
-		}, obj);
-}
 
-/**
- * Handle conversion errors based on error handling strategy
- */
-function handleConversionErrors(
-	results: ConversionResult[],
-	errorHandling: string,
-	itemIndex: number,
-	node: any
-): ConversionResult[] {
-		const validResults: ConversionResult[] = [];
-		const errors: string[] = [];
-
-		for (const result of results) {
-			if (result.valid) {
-				validResults.push(result);
-			} else {
-				errors.push(`${result.name}: ${result.error}`);
-
-				if (errorHandling === 'stop_on_error') {
-					throw new NodeOperationError(
-						node,
-						`Conversion error in item ${itemIndex}: ${result.error}`
-					);
-				} else if (errorHandling === 'default_values') {
-					// Create default value result
-					const defaultResult: ConversionResult = {
-						...result,
-						value: getDefaultValue(result.dataType),
-						valid: true,
-						error: undefined,
-					};
-					validResults.push(defaultResult);
+async function executeCustomMode(context: IExecuteFunctions, item: INodeExecutionData, itemIndex: number): Promise<IDataObject> {
+		const conversions = context.getNodeParameter('conversions', itemIndex, []) as any[];
+		const inputSource = context.getNodeParameter('inputSource', itemIndex, 'auto') as string;
+		
+		// Extract registers from input
+		let registers: number[];
+		
+		if (inputSource === 'auto') {
+			registers = extractRegistersSimple(item.json) || [];
+		} else if (inputSource === 'data') {
+			registers = (item.json.data as number[]) || [];
+		} else {
+			// Custom path handling could be added here
+			registers = extractRegistersSimple(item.json) || [];
+		}
+		
+		if (registers.length === 0) {
+			throw new Error('No register data found');
+		}
+		
+		const output: IDataObject = {
+			_registers: registers,
+			_register_count: registers.length,
+		};
+		
+		// Process each conversion rule
+		for (const conv of conversions) {
+			if (!conv.name) continue;
+			
+			try {
+				const rule = {
+					name: conv.name,
+					startRegister: conv.startRegister || 0,
+					dataType: conv.dataType || 'int16',
+					byteOrder: conv.byteOrder || 'big_endian',
+					scaleFactor: conv.scaleFactor,
+					offset: conv.offset,
+				};
+				
+				const result = DataConversionUtils.convertData(registers, rule);
+				
+				if (result.valid) {
+					output[conv.name] = result.value;
+				} else {
+					output[conv.name + '_error'] = result.error;
 				}
-				// For 'skip_invalid', we just don't add the result
+			} catch (error) {
+				output[conv.name + '_error'] = error.message;
 			}
 		}
-
-		return validResults;
+		
+		return output;
 }
 
-/**
- * Get default value for data type
- */
-function getDefaultValue(dataType: string): any {
-		switch (dataType) {
-			case 'int16':
-			case 'uint16':
-			case 'int32':
-			case 'uint32':
-			case 'float32':
-			case 'scaled':
-				return 0;
-			case 'bitfield':
-				return false;
-			case 'bcd':
-				return 0;
-			default:
-				return null;
+function extractRegistersSimple(inputData: IDataObject): number[] | null {
+		// Try common patterns
+		if (inputData.data && Array.isArray(inputData.data)) {
+			return inputData.data as number[];
 		}
-}
-
-/**
- * Format output data according to output format settings
- */
-function formatOutput(
-	results: ConversionResult[],
-	parameters: NodeParameters,
-	originalData: IDataObject
-): IDataObject {
-		const outputData: IDataObject = { ...originalData };
-
-		// Add timestamp if requested
-		if (parameters.addTimestamp) {
-			outputData.timestamp = new Date().toISOString();
+		if (Array.isArray(inputData)) {
+			return inputData as number[];
 		}
-
-		// Add individual fields
-		if (parameters.outputFormat === 'individual_fields' || parameters.outputFormat === 'both') {
-			results.forEach(result => {
-				outputData[result.name] = result.value;
-				
-				if (parameters.addMetadata && result.metadata) {
-					outputData[`${result.name}_metadata`] = result.metadata;
-				}
-			});
+		if (inputData.registers && Array.isArray(inputData.registers)) {
+			return inputData.registers as number[];
 		}
-
-		// Add conversion object
-		if (parameters.outputFormat === 'conversion_object' || parameters.outputFormat === 'both') {
-			const conversions: IDataObject = {};
-			
-			results.forEach(result => {
-				conversions[result.name] = {
-					value: result.value,
-					originalValue: result.originalValue,
-					dataType: result.dataType,
-					valid: result.valid,
-					...(parameters.addMetadata && result.metadata ? { metadata: result.metadata } : {}),
-				};
-			});
-
-			outputData.conversions = conversions;
+		if (inputData.values && Array.isArray(inputData.values)) {
+			return inputData.values as number[];
 		}
-
-		return outputData;
-}
+		return null;
+	}

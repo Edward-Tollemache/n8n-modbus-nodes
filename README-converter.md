@@ -1,6 +1,16 @@
 # Modbus Data Converter Node
 
-The Modbus Data Converter node transforms raw Modbus register data into usable industrial data types with comprehensive conversion capabilities, validation, and error handling.
+Transforms raw Modbus register data into industrial data types with conversion capabilities, validation, and error handling.
+
+## Enhanced Version
+
+The Enhanced Data Converter includes:
+
+- **Auto-Detection**: Detects and converts common data patterns
+- **Device Presets**: Pre-configured templates for 8+ industrial devices
+- **Quick Convert**: Simple conversion options
+- **Smart Suggestions**: Conversion recommendations
+- **Backward Compatible**: Original features available in Custom mode
 
 ## Features
 
@@ -385,6 +395,38 @@ This node is part of the n8n-nodes-modbus-fccomplete package. Contributions are 
 - Report issues on [GitHub](https://github.com/Edward-Tollemache/n8n-modbus-nodes/issues)
 - Submit pull requests for improvements
 - Share industrial use cases and examples
+
+## Enhanced Data Converter Guide
+
+### Auto-Detection Mode
+Connect Modbus data. The converter will:
+1. Detect if data is from a Modbus node
+2. Analyze data patterns
+3. Suggest appropriate conversions
+4. Provide converted values with units
+
+### Device Presets
+Pre-configured industrial devices:
+- **Temperature Sensor**: Float32 with C/F conversion
+- **Pressure Transmitter**: Scaled 4-20mA values
+- **Power Meter**: 3-phase voltage, current, power
+- **Flow Meter**: Rate and totalization
+- **PLC Status**: Bitfield and status words
+- **VFD Drive**: Frequency, current, status
+- **Tank Level**: Percentage scaling
+- **Energy Meter**: kWh, power factor
+
+### Quick Convert Options
+- **Single Value**: INT16 with scaling factors
+- **Float (2 Registers)**: IEEE 754 float detection
+- **Long Integer**: 32-bit signed/unsigned
+- **All Common Types**: Show all possibilities
+
+### Migration from Standard Converter
+1. Existing workflows continue to work
+2. Use "Custom Mode" for manual configuration
+3. Try "Auto-Detect" mode first
+4. Check if device matches a preset
 
 ## License
 
