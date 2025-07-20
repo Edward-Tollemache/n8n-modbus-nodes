@@ -100,11 +100,7 @@ export class Modbus implements INodeType {
 				name: 'quantity',
 				type: 'number',
 				default: 1,
-				description: 'The number of coils/inputs/registers to read',
-				typeOptions: {
-					maxValue: 2000,
-					minValue: 1,
-				},
+				description: 'The number of registers or coils to read',
 			},
 			{
 				displayName: 'Value',

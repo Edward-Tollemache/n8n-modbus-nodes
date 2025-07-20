@@ -4,7 +4,7 @@
 
 ## Description
 
-n8n community node package for industrial automation with Modbus protocol support. Includes three nodes for reading, writing, and converting Modbus data.
+n8n community node package for industrial automation with complete Modbus protocol support. Provides three nodes for reading, writing, and converting Modbus data with an intuitive interface.
 
 ## Features
 
@@ -12,15 +12,37 @@ n8n community node package for industrial automation with Modbus protocol suppor
 
 1. **Modbus Trigger** - Triggers workflows based on Modbus events
 2. **Modbus** - Read/write operations for function codes FC1-FC4
-3. **Modbus Data Converter (Enhanced)** - Converts raw register data with auto-detection and presets
+3. **Modbus Data Converter** - Quick and custom data conversion with scaling
 
-### Capabilities
+### Modbus Support
 
-- Function codes: FC1 (Read Coils), FC2 (Read Discrete Inputs), FC3 (Read Holding Registers), FC4 (Read Input Registers)
-- Data types: INT16, UINT16, INT32, UINT32, FLOAT32, Scaled values, Bitfields, BCD
-- Byte ordering: Big Endian and Little Endian
-- Unit conversions: Temperature, pressure, flow, power
-- Validation and error handling options
+- **Function codes**: FC1 (Read Coils), FC2 (Read Discrete Inputs), FC3 (Read Holding Registers), FC4 (Read Input Registers)
+- **Data types**: INT16, UINT16, INT32, UINT32, FLOAT32, Double, BCD, Bitfields
+- **Byte ordering**: Big Endian and Little Endian
+- **Connection types**: TCP/IP with configurable timeout and retry
+
+### Data Converter Features
+
+#### Quick Convert Mode
+- **Single Value** - Basic INT16 conversion with scaling
+- **Float (2 Registers)** - IEEE 754 32-bit floating point
+- **Long Integer (2 Registers)** - 32-bit signed/unsigned with value selection
+- **Double (4 Registers)** - 64-bit double precision
+- **BCD** - Binary Coded Decimal conversion
+- **Bitfield** - Individual bit extraction for status flags
+- **All Common Types** - Shows all possible conversions
+
+#### Custom Mode
+- Multiple conversion rules per execution
+- Named output fields
+- Full data type support
+- Configurable scaling and offsets
+
+#### Output Organization
+- **Configurable field names** for clean output structure
+- **Optional metadata** with conversion details
+- **Timestamp support** for time-series data
+- **Scaling options** with direct factor input
 
 ## Installation
 
@@ -32,118 +54,98 @@ npm install n8n-nodes-modbus-fccomplete
 
 ## Quick Start
 
+### Power Meter Example (replaces Node-RED function)
+
+1. **Modbus Node**:
+   - Function Code: FC3 (Read Holding Registers)
+   - Memory Address: Power register address
+   - Quantity: 2 (for 32-bit values)
+
+2. **Modbus Data Converter**:
+   - Conversion Mode: Quick Convert
+   - Quick Convert Type: Long Integer (2 Registers)
+   - Long Integer Value: Signed (for negative power)
+   - Scale: ✅ Enabled
+   - Scale Factor: 0.001 (divides by 1000)
+   - Add Timestamp: ✅ Enabled
+
+**Output:**
+```json
+{
+  "output": {
+    "value": 1.234
+  },
+  "timestamp": "2024-01-01T12:00:00.000Z"
+}
+```
+
+Access your power value with: `{{ $json.output.value }}`
+
 ### Temperature Sensor Example
 
 1. **Modbus Node**:
    - Function Code: FC3 (Read Holding Registers)
-   - Memory Address: Sensor register address
-   - Quantity: 2 (for float32 values)
+   - Memory Address: Temperature register
+   - Quantity: 2
 
-2. **Modbus Data Converter (Enhanced)**: 
-   - Conversion Mode: "Auto-Detect"
-   - Automatically detects float32 temperature data
+2. **Modbus Data Converter**:
+   - Conversion Mode: Quick Convert
+   - Quick Convert Type: Float (2 Registers)
+   - Byte Order: Big Endian
+   - Output Field Name: "temperature"
 
-### Device Preset Example
-
-**Power Meter**:
-- Conversion Mode: "Device Preset"
-- Device Type: "Power Meter"
-- Extracts voltage, current, and power readings
-
-## Node Details
-
-### Modbus Read/Write Node
-
-- Read Operations: Coils, Discrete Inputs, Holding Registers, Input Registers
-- Write Operations: Single register writes
-- Output Format: JSON with function code, address, and data array
-
-### Modbus Data Converter (Enhanced)
-
-Conversion modes:
-
-1. **Auto-Detect**: Identifies data patterns and suggests conversions
-2. **Quick Convert**: Simple conversions for common scenarios
-3. **Device Preset**: Pre-configured templates for industrial devices
-4. **Custom**: Manual configuration
-
-Device Presets:
-- Temperature Sensor
-- Pressure Transmitter
-- Power Meter (3-phase)
-- Flow Meter
-- PLC Status Registers
-- VFD Drive
-- Tank Level Sensor
-- Energy Meter
-
-## Examples
-
-### Auto-Detection Example
-```javascript
-// Input from Modbus Read
+**Output:**
+```json
 {
-  "functionCode": "FC3",
-  "address": 100,
-  "quantity": 2,
-  "data": [16968, 41943]
-}
-
-// Converter in Auto-Detect mode outputs:
-{
-  "value": 23.45,
-  "type": "float32",
-  "temperature_celsius": 23.45,
-  "temperature_fahrenheit": 74.21
+  "temperature": {
+    "value": 23.5
+  }
 }
 ```
 
-### Quick Convert for Scaling
-```javascript
-// Input: Raw 4-20mA value
-{ "data": [27648] }
+## Configuration
 
-// Quick Convert Mode: "Single Value"
-// Output:
-{
-  "value": 27648,
-  "scaled_100": 276.48,
-  "scaled_1000": 27.648
-}
-```
+### Modbus Connection
 
-## Advanced Features
+Configure connection credentials in n8n:
+- **Host**: Modbus server IP address
+- **Port**: Default 502 for Modbus TCP
+- **Unit ID**: Modbus slave/unit identifier
+- **Timeout**: Connection timeout in milliseconds
 
-- Data validation with min/max ranges
-- Error handling: stop on error, skip invalid, or use default values
-- Performance mode for high-volume processing
+### Data Converter Scaling
 
-## Credentials
+Common scaling examples:
+- **Temperature sensors**: Often need scaling (e.g., 0.1 for tenths of degrees)
+- **Power meters**: Typically 0.001 for kW conversion
+- **Pressure sensors**: Various factors depending on units
 
-Configure Modbus connection:
-- **Host**: IP address of the Modbus device
-- **Port**: Port number (default: 502)
-- **Unit ID**: Modbus slave ID (default: 1)
+## Troubleshooting
 
-## Support
+### Common Issues
 
-- GitHub repository: https://github.com/Edward-Tollemache/n8n-modbus-nodes
-- Examples: `./examples` folder
-- Converter documentation: `./README-converter.md`
+1. **"No register data found"**
+   - Ensure Modbus node output contains `data` array
+   - Check connection to Modbus device
+
+2. **Incorrect values**
+   - Verify byte order (Big Endian vs Little Endian)
+   - Check data type selection (signed vs unsigned)
+   - Confirm scaling factor
+
+3. **Connection timeouts**
+   - Increase timeout in credentials
+   - Verify network connectivity
+   - Check Modbus device configuration
+
+## Version History
+
+- **v0.10.0** - Initial release with simplified Quick Convert and Custom modes, improved UI with always-visible output options
 
 ## Contributing
 
-Submit Pull Requests for contributions.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT License - see LICENSE.md for details
-
-## Changelog
-
-### v0.4.0
-- Added Enhanced Data Converter with auto-detection
-- Implemented industrial device presets
-- Improved error handling and validation
-- Added quick conversion modes
-- Enhanced documentation and examples
+MIT License

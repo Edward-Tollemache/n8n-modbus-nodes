@@ -1,7 +1,7 @@
 {
 	"name": "n8n-nodes-modbus-fccomplete",
-	"version": "0.5.2",
-	"description": "n8n nodes for industrial automation with full Modbus support (FC1-FC4) and enhanced data conversion with auto-detection and device presets",
+	"version": "0.14.0",
+	"description": "n8n nodes for industrial automation with complete Modbus support (FC1-FC4) and intuitive data conversion with scaling options",
 	"keywords": [
 		"n8n-community-node-package",
 		"n8n-nodes-modbus-fccomplete",
@@ -19,12 +19,11 @@
 		"data-conversion",
 		"industrial-automation",
 		"scaling",
-		"unit-conversion",
+		"quick-convert",
+		"float32",
+		"int32",
 		"bitfield",
-		"bcd",
-		"auto-detection",
-		"device-presets",
-		"enhanced-converter"
+		"bcd"
 	],
 	"license": "MIT",
 	"homepage": "",
@@ -62,7 +61,7 @@
 		"nodes": [
 			"dist/nodes/Modbus/ModbusTrigger.node.js",
 			"dist/nodes/Modbus/Modbus.node.js",
-			"dist/nodes/ModbusDataConverter/ModbusDataConverter.node.js"
+			"dist/nodes/Modbus/ModbusDataConverter.node.js"
 		]
 	},
 	"devDependencies": {
