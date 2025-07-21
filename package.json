@@ -1,0 +1,81 @@
+{
+	"name": "n8n-nodes-modbus-fccomplete",
+	"version": "0.14.0",
+	"description": "n8n nodes for industrial automation with complete Modbus support (FC1-FC4) and intuitive data conversion with scaling options",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n-nodes-modbus-fccomplete",
+		"n8n-nodes-modbus",
+		"n8n-nodes",
+		"modbus",
+		"fc1",
+		"fc2",
+		"fc3",
+		"fc4",
+		"coils",
+		"discrete-inputs",
+		"holding-registers",
+		"input-registers",
+		"data-conversion",
+		"industrial-automation",
+		"scaling",
+		"quick-convert",
+		"float32",
+		"int32",
+		"bitfield",
+		"bcd"
+	],
+	"license": "MIT",
+	"homepage": "",
+	"author": {
+		"name": "Alexandre Alves",
+		"email": "ajhalvs@gmail.com"
+	},
+	"contributors": [
+		{
+			"name": "Edward Tollemache",
+			"email": "Edward-Tollemache@users.noreply.github.com"
+		}
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Edward-Tollemache/n8n-modbus-nodes"
+	},
+	"main": "index.js",
+	"scripts": {
+		"build": "tsc && gulp build:icons",
+		"dev": "tsc --watch",
+		"format": "prettier nodes credentials --write",
+		"lint": "eslint nodes credentials package.json",
+		"lintfix": "eslint nodes credentials package.json --fix",
+		"prepublishOnly": "npm run build"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"credentials": [
+			"dist/credentials/ModbusApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Modbus/ModbusTrigger.node.js",
+			"dist/nodes/Modbus/Modbus.node.js",
+			"dist/nodes/Modbus/ModbusDataConverter.node.js"
+		]
+	},
+	"devDependencies": {
+		"@typescript-eslint/parser": "~5.45",
+		"eslint-plugin-n8n-nodes-base": "^1.11.0",
+		"gulp": "^4.0.2",
+		"n8n-workflow": "*",
+		"prettier": "^2.7.1",
+		"typescript": "~4.8.4"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	},
+	"dependencies": {
+		"modbus-stream": "^0.46.0"
+	}
+}
