@@ -325,6 +325,19 @@ export class ModbusDataConverter implements INodeType {
 						description: 'Byte order for multi-register values',
 					},
 					{
+						displayName: 'Word Swap',
+						name: 'wordSwap',
+						type: 'boolean',
+						displayOptions: {
+							show: {
+								conversionMode: ['quick'],
+								quickConvertType: ['float', 'long', 'double'],
+							},
+						},
+						default: false,
+						description: 'Swap the order of 16-bit words within multi-register values (ABCD→CDAB, DCBA→BADC)',
+					},
+					{
 						displayName: 'Scale Factor',
 						name: 'scaleFactor',
 						type: 'number',
@@ -392,6 +405,7 @@ export class ModbusDataConverter implements INodeType {
 async function executeQuickMode(context: IExecuteFunctions, item: INodeExecutionData, itemIndex: number): Promise<IDataObject> {
 	const quickType = context.getNodeParameter('quickConvertType', itemIndex) as string;
 	const byteOrder = context.getNodeParameter('quickByteOrder', itemIndex, 'BE') as string;
+	const wordSwap = context.getNodeParameter('wordSwap', itemIndex, false) as boolean;
 	const enableScaling = context.getNodeParameter('enableScaling', itemIndex, false) as boolean;
 	const scaleFactorValue = context.getNodeParameter('scaleFactorValue', itemIndex, 1) as number;
 	const longIntegerValue = context.getNodeParameter('longIntegerValue', itemIndex, 'signed') as string;
@@ -420,6 +434,7 @@ async function executeQuickMode(context: IExecuteFunctions, item: INodeExecution
 	if (includeMetadata) {
 		metadata.type = quickType;
 		metadata.byteOrder = byteOrder;
+		metadata.wordSwap = wordSwap;
 		metadata.rawRegisters = registers;
 		metadata.registerCount = registers.length;
 		if (enableScaling) {
@@ -447,6 +462,7 @@ async function executeQuickMode(context: IExecuteFunctions, item: INodeExecution
 					startRegister: 0,
 					dataType: 'float32',
 					byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					wordSwap: wordSwap,
 				});
 				if (floatResult.valid) {
 					convertedData.value = enableScaling ? floatResult.value * scaleFactor : floatResult.value;
@@ -462,12 +478,14 @@ async function executeQuickMode(context: IExecuteFunctions, item: INodeExecution
 					startRegister: 0,
 					dataType: 'int32',
 					byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					wordSwap: wordSwap,
 				});
 				const uint32Result = DataConversionUtils.convertData(registers, {
 					name: 'value_unsigned',
 					startRegister: 0,
 					dataType: 'uint32',
 					byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+					wordSwap: wordSwap,
 				});
 				
 				// Return values based on selection
@@ -519,7 +537,7 @@ async function executeQuickMode(context: IExecuteFunctions, item: INodeExecution
 
 		case 'all':
 			// For 'all' mode, use special handling
-			return organizeAllConversionsOutput(registers, byteOrder, enableScaling, scaleFactor, 
+			return organizeAllConversionsOutput(registers, byteOrder, wordSwap, enableScaling, scaleFactor, 
 				includeMetadata, addTimestamp, outputFieldName, metadataFieldName);
 	}
 
@@ -651,6 +669,7 @@ function extractBits(value: number): IDataObject {
 function organizeAllConversionsOutput(
 	registers: number[], 
 	byteOrder: string, 
+	wordSwap: boolean,
 	enableScaling: boolean, 
 	scaleFactor: number,
 	includeMetadata: boolean, 
@@ -677,18 +696,21 @@ function organizeAllConversionsOutput(
 			startRegister: 0,
 			dataType: 'float32',
 			byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+			wordSwap: wordSwap,
 		});
 		const int32Result = DataConversionUtils.convertData(registers, {
 			name: 'int32',
 			startRegister: 0,
 			dataType: 'int32',
 			byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+			wordSwap: wordSwap,
 		});
 		const uint32Result = DataConversionUtils.convertData(registers, {
 			name: 'uint32',
 			startRegister: 0,
 			dataType: 'uint32',
 			byteOrder: byteOrder === 'BE' ? 'big_endian' : 'little_endian',
+			wordSwap: wordSwap,
 		});
 		
 		if (floatResult.valid) {
@@ -717,6 +739,7 @@ function organizeAllConversionsOutput(
 		const metadata: IDataObject = {
 			type: 'all',
 			byteOrder: byteOrder,
+			wordSwap: wordSwap,
 			rawRegisters: registers,
 			registerCount: registers.length,
 		};

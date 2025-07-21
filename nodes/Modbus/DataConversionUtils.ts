@@ -4,6 +4,7 @@ export interface ConversionRule {
 	startRegister: number;
 	dataType: 'int16' | 'uint16' | 'int32' | 'uint32' | 'float32' | 'scaled' | 'bitfield' | 'bcd';
 	byteOrder: 'big_endian' | 'little_endian';
+	wordSwap?: boolean;
 	scaleFactor?: number;
 	offset?: number;
 	decimalPlaces?: number;
@@ -77,13 +78,13 @@ export class DataConversionUtils {
 					result.value = this.convertUint16(dataRegisters[0], rule.byteOrder);
 					break;
 				case 'int32':
-					result.value = this.convertInt32(dataRegisters, rule.byteOrder);
+					result.value = this.convertInt32(dataRegisters, rule.byteOrder, rule.wordSwap);
 					break;
 				case 'uint32':
-					result.value = this.convertUint32(dataRegisters, rule.byteOrder);
+					result.value = this.convertUint32(dataRegisters, rule.byteOrder, rule.wordSwap);
 					break;
 				case 'float32':
-					result.value = this.convertFloat32(dataRegisters, rule.byteOrder);
+					result.value = this.convertFloat32(dataRegisters, rule.byteOrder, rule.wordSwap);
 					break;
 				case 'scaled':
 					result.value = this.convertScaled(dataRegisters[0], rule);
@@ -177,15 +178,19 @@ export class DataConversionUtils {
 	/**
 	 * Convert two registers to signed 32-bit integer
 	 */
-	private static convertInt32(registers: number[], byteOrder: string): number {
+	private static convertInt32(registers: number[], byteOrder: string, wordSwap: boolean = false): number {
+		// Apply word swap if requested
+		const reg0 = wordSwap ? registers[1] : registers[0];
+		const reg1 = wordSwap ? registers[0] : registers[1];
+
 		let value: number;
 		
 		if (byteOrder === 'big_endian') {
 			// High register first, then low register
-			value = (registers[0] << 16) | registers[1];
+			value = (reg0 << 16) | reg1;
 		} else {
 			// Little endian: low register first, then high register
-			value = (registers[1] << 16) | registers[0];
+			value = (reg1 << 16) | reg0;
 		}
 
 		// Convert to signed 32-bit
@@ -198,27 +203,35 @@ export class DataConversionUtils {
 	/**
 	 * Convert two registers to unsigned 32-bit integer
 	 */
-	private static convertUint32(registers: number[], byteOrder: string): number {
+	private static convertUint32(registers: number[], byteOrder: string, wordSwap: boolean = false): number {
+		// Apply word swap if requested
+		const reg0 = wordSwap ? registers[1] : registers[0];
+		const reg1 = wordSwap ? registers[0] : registers[1];
+
 		if (byteOrder === 'big_endian') {
-			return ((registers[0] << 16) | registers[1]) >>> 0;
+			return ((reg0 << 16) | reg1) >>> 0;
 		} else {
-			return ((registers[1] << 16) | registers[0]) >>> 0;
+			return ((reg1 << 16) | reg0) >>> 0;
 		}
 	}
 
 	/**
 	 * Convert two registers to IEEE 754 32-bit float
 	 */
-	private static convertFloat32(registers: number[], byteOrder: string): number {
+	private static convertFloat32(registers: number[], byteOrder: string, wordSwap: boolean = false): number {
 		const buffer = new ArrayBuffer(4);
 		const view = new DataView(buffer);
 
+		// Apply word swap if requested
+		const reg0 = wordSwap ? registers[1] : registers[0];
+		const reg1 = wordSwap ? registers[0] : registers[1];
+
 		if (byteOrder === 'big_endian') {
-			view.setUint16(0, registers[0], false);
-			view.setUint16(2, registers[1], false);
+			view.setUint16(0, reg0, false);
+			view.setUint16(2, reg1, false);
 		} else {
-			view.setUint16(0, registers[1], false);
-			view.setUint16(2, registers[0], false);
+			view.setUint16(0, reg1, false);
+			view.setUint16(2, reg0, false);
 		}
 
 		return view.getFloat32(0, false);
