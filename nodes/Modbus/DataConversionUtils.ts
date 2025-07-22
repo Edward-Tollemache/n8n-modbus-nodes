@@ -187,10 +187,12 @@ export class DataConversionUtils {
 		
 		if (byteOrder === 'big_endian') {
 			// High register first, then low register
-			value = (reg0 << 16) | reg1;
+			// Mask reg1 to ensure it's treated as unsigned 16-bit
+			value = (reg0 << 16) | (reg1 & 0xFFFF);
 		} else {
 			// Little endian: low register first, then high register
-			value = (reg1 << 16) | reg0;
+			// Mask reg0 to ensure it's treated as unsigned 16-bit
+			value = (reg1 << 16) | (reg0 & 0xFFFF);
 		}
 
 		// Convert to signed 32-bit
@@ -209,9 +211,11 @@ export class DataConversionUtils {
 		const reg1 = wordSwap ? registers[0] : registers[1];
 
 		if (byteOrder === 'big_endian') {
-			return ((reg0 << 16) | reg1) >>> 0;
+			// Mask reg1 to ensure it's treated as unsigned 16-bit
+			return ((reg0 << 16) | (reg1 & 0xFFFF)) >>> 0;
 		} else {
-			return ((reg1 << 16) | reg0) >>> 0;
+			// Mask reg0 to ensure it's treated as unsigned 16-bit
+			return ((reg1 << 16) | (reg0 & 0xFFFF)) >>> 0;
 		}
 	}
 

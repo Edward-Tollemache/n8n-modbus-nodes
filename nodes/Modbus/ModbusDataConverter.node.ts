@@ -124,6 +124,21 @@ export class ModbusDataConverter implements INodeType {
 				default: 'BE',
 			},
 
+			// Word Swap Option for Quick Convert
+			{
+				displayName: 'Word Swap',
+				name: 'wordSwap',
+				type: 'boolean',
+				displayOptions: {
+					show: {
+						conversionMode: ['quick'],
+						quickConvertType: ['float', 'long', 'double'],
+					},
+				},
+				default: false,
+				description: 'Swap the order of 16-bit words within multi-register values (ABCD→CDAB, DCBA→BADC)',
+			},
+
 			// Simple Scaling for Quick Convert
 			{
 				displayName: 'Scale',
@@ -170,17 +185,17 @@ export class ModbusDataConverter implements INodeType {
 				},
 				options: [
 					{
-						name: 'Signed (allows negative values)',
+						name: 'Signed (Allows Negative Values)',
 						value: 'signed',
 						description: 'Treats the value as signed 32-bit integer',
 					},
 					{
-						name: 'Unsigned (positive only)',
+						name: 'Unsigned (Positive Only)',
 						value: 'unsigned', 
 						description: 'Treats the value as unsigned 32-bit integer',
 					},
 					{
-						name: 'Both (returns both signed and unsigned)',
+						name: 'Both (Returns Both Signed and Unsigned)',
 						value: 'both',
 						description: 'Returns both value_signed and value_unsigned',
 					},
@@ -200,7 +215,7 @@ export class ModbusDataConverter implements INodeType {
 					},
 				},
 				default: false,
-				description: 'Include conversion details (type, scale factor, raw registers)',
+				description: 'Whether to include conversion details (type, scale factor, raw registers)',
 			},
 
 			{
@@ -213,7 +228,7 @@ export class ModbusDataConverter implements INodeType {
 					},
 				},
 				default: false,
-				description: 'Add timestamp to output',
+				description: 'Whether to add timestamp to output',
 			},
 
 			{
@@ -330,8 +345,7 @@ export class ModbusDataConverter implements INodeType {
 						type: 'boolean',
 						displayOptions: {
 							show: {
-								conversionMode: ['quick'],
-								quickConvertType: ['float', 'long', 'double'],
+								dataType: ['int32', 'uint32', 'float32'],
 							},
 						},
 						default: false,
@@ -510,7 +524,7 @@ async function executeQuickMode(context: IExecuteFunctions, item: INodeExecution
 
 		case 'double':
 			if (registers.length >= 4) {
-				const doubleValue = convertToDouble(registers, byteOrder === 'BE');
+				const doubleValue = convertToDouble(registers, byteOrder === 'BE', wordSwap);
 				if (typeof doubleValue === 'number') {
 					convertedData.value = enableScaling ? doubleValue * scaleFactor : doubleValue;
 					if (includeMetadata) metadata.dataType = 'double';
@@ -579,6 +593,7 @@ async function executeCustomMode(context: IExecuteFunctions, item: INodeExecutio
 				startRegister: conv.startRegister || 0,
 				dataType: conv.dataType || 'int16',
 				byteOrder: conv.byteOrder || 'big_endian',
+				wordSwap: conv.wordSwap || false,
 				scaleFactor: conv.scaleFactor,
 				offset: conv.offset,
 			};
@@ -616,22 +631,29 @@ function extractRegisters(inputData: IDataObject): number[] | null {
 }
 
 
-function convertToDouble(registers: number[], bigEndian: boolean): number | null {
+function convertToDouble(registers: number[], bigEndian: boolean, wordSwap: boolean = false): number | null {
 	if (registers.length < 4) return null;
 	
 	try {
 		const buffer = Buffer.allocUnsafe(8);
 		
+		// Apply word swap if needed
+		let regs = [...registers];
+		if (wordSwap) {
+			// Swap pairs: [0,1,2,3] -> [1,0,3,2]
+			regs = [registers[1], registers[0], registers[3], registers[2]];
+		}
+		
 		if (bigEndian) {
-			buffer.writeUInt16BE(registers[0], 0);
-			buffer.writeUInt16BE(registers[1], 2);
-			buffer.writeUInt16BE(registers[2], 4);
-			buffer.writeUInt16BE(registers[3], 6);
+			buffer.writeUInt16BE(regs[0], 0);
+			buffer.writeUInt16BE(regs[1], 2);
+			buffer.writeUInt16BE(regs[2], 4);
+			buffer.writeUInt16BE(regs[3], 6);
 		} else {
-			buffer.writeUInt16LE(registers[3], 0);
-			buffer.writeUInt16LE(registers[2], 2);
-			buffer.writeUInt16LE(registers[1], 4);
-			buffer.writeUInt16LE(registers[0], 6);
+			buffer.writeUInt16LE(regs[3], 0);
+			buffer.writeUInt16LE(regs[2], 2);
+			buffer.writeUInt16LE(regs[1], 4);
+			buffer.writeUInt16LE(regs[0], 6);
 		}
 		
 		return buffer.readDoubleLE(0);

@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-modbus-fccomplete",
-	"version": "0.15.0",
+	"version": "0.16.1",
 	"description": "n8n nodes for industrial automation with complete Modbus support (FC1-FC4) and intuitive data conversion with scaling options",
 	"keywords": [
 		"n8n-community-node-package",
